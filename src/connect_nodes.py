@@ -123,25 +123,33 @@ def depth_first_cycle_finder(img, nodes, node_neighbors, original_root, root=Non
             while sources[i] != neighbor:
                 path.append(i)
                 i = sources[i]
+            path.append(i)
             path.append(neighbor)
             print(path)
+            max_path = []
+            max_d = 0
             for j in range(len(path)):
                 d = np.sqrt(np.sum(np.power(np.array(nodes[path[j]]) - np.array(nodes[path[j-1]]), 2)))
-
-                print("Path: ", path[j], path[j-1], d)
+                if d > max_d:
+                    max_path = (path[j], path[j - 1])
+                    max_d = d
+            a, b = max_path
+            node_neighbors[a] = [x for x in node_neighbors[a] if x != b]
+            node_neighbors[b] = [x for x in node_neighbors[b] if x != a]
+            
                 
-            d1 = np.sqrt(np.sum(np.power(np.array(nodes[i]) - np.array(nodes[neighbor]), 2)))
-            d2 = np.sqrt(np.sum(np.power(np.array(nodes[root]) - np.array(nodes[neighbor]), 2)))
-            print('distance', i, neighbor, d1)
-            print('distance', root, neighbor, d2)
-            if d1 > d2:
-                node_neighbors[neighbor] = [x for x in node_neighbors[neighbor] if x != i]
-                node_neighbors[i] = [x for x in node_neighbors[i] if x != neighbor]
-                print("removing", neighbor, i)
-            else:
-                node_neighbors[neighbor] = [x for x in node_neighbors[neighbor] if x != root]
-                node_neighbors[root] = [x for x in node_neighbors[root] if x != neighbor]
-                print("removing", neighbor, root)
+            #d1 = np.sqrt(np.sum(np.power(np.array(nodes[i]) - np.array(nodes[neighbor]), 2)))
+            #d2 = np.sqrt(np.sum(np.power(np.array(nodes[root]) - np.array(nodes[neighbor]), 2)))
+            #print('distance', i, neighbor, d1)
+            #print('distance', root, neighbor, d2)
+            #if d1 > d2:
+            #    node_neighbors[neighbor] = [x for x in node_neighbors[neighbor] if x != i]
+            #    node_neighbors[i] = [x for x in node_neighbors[i] if x != neighbor]
+            #    print("removing", neighbor, i)
+            #else:
+            #    node_neighbors[neighbor] = [x for x in node_neighbors[neighbor] if x != root]
+            #    node_neighbors[root] = [x for x in node_neighbors[root] if x != neighbor]
+            #    print("removing", neighbor, root)
             return None
         sources[neighbor] = root
         #print(root, neighbor)
@@ -390,10 +398,10 @@ def main():
     print("Root:", root)
     
     #sources = breadth_first_disconnect(nodes, node_neighbors, root)
-    #sources = depth_first_cycle_finder(np.copy(img), nodes, node_neighbors, root)
-    #while sources is None:
-    #    print("TRYING AGAIN\n")
-    #    sources = depth_first_cycle_finder(np.copy(img), nodes, node_neighbors, root)
+    sources = depth_first_cycle_finder(np.copy(img), nodes, node_neighbors, root)
+    while sources is None:
+        print("TRYING AGAIN\n")
+        sources = depth_first_cycle_finder(np.copy(img), nodes, node_neighbors, root)
 
     #edges = edges_from_neighbors(node_neighbors)
     #distances = []
@@ -407,7 +415,6 @@ def main():
     for i in range(len(nodes)):
         if len(node_neighbors[i]) == 2:
             n1, n2 = node_neighbors[i]
-            continue
             for j in node_neighbors:
                 print(node_neighbors[j], i, j)
                 node_neighbors[j] = [x for x in node_neighbors[j] if x != i]
@@ -424,15 +431,15 @@ def main():
         node_x, node_y = nodes[i]
         for neighbor in node_neighbors[i]:
             neighbor_x, neighbor_y = nodes[neighbor]
-            cv2.line(img, (node_x, node_y), (neighbor_x, neighbor_y), (0,255,0), 1)
+            cv2.line(img, (node_x, node_y), (neighbor_x, neighbor_y), (0,255,0), 3)
             
     #print("SOURCES")
     #for i in sorted(sources):
     #    print(i, sources[i])
                                                                                 
-    print("NODE NEIGHBORS")
-    for i in sorted(node_neighbors):
-        print(i, node_neighbors[i])
+    #print("NODE NEIGHBORS")
+    #for i in sorted(node_neighbors):
+    #    print(i, node_neighbors[i])
             
     for i in sorted(node_neighbors):
         cv2.putText(img, str(i), nodes[i], cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255))
