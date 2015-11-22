@@ -30,7 +30,7 @@ def find_connected_nodes(image, i, nodes):
             start_y = image.shape[-2] // 3
             end_y = image.shape[-2]
         
-        contour = find_tree_contour(cutout, 1)
+        contour = find_tree_contour(cutout, 1, 0.75)
         other = False
         for k in range(len(nodes)):
             if k == j or k == i: continue
@@ -41,8 +41,11 @@ def find_connected_nodes(image, i, nodes):
                 if contour[k_y, k_x] < 128:
                     other = True
                     break
-
+        
         if other == False and contour[y - min_y + 1, x - min_x + 1] < 128 and contour[dst_y - min_y + 1, dst_x - min_x + 1] < 128:
+            #cv2.imshow('1', cutout)
+            #cv2.imshow('2', contour)
+            #cv2.waitKey(0)
             out.append(nodes[j])                
     return out
 
@@ -108,7 +111,7 @@ def nodes_from_corners(image, gray, points, max_dist=16, iterations=1):
         neighbors = np.array(neighbors)
         point = neighbors[np.random.randint(len(neighbors))]
         point = np.mean(neighbors, axis=0)
-        print(len(points))
+        print('Remaining corner points to assign a corner:', len(points))
         if iterations == 1:
             #image[point[1], point[0], :] = (255, 0, 0)
             cv2.circle(image, tuple(map(int, point)), 4, (255,128,0), 2)
@@ -117,7 +120,7 @@ def nodes_from_corners(image, gray, points, max_dist=16, iterations=1):
 
 
 # Find the contour of the tree
-def find_tree_contour(gray, param):
+def find_tree_contour(gray, param, min_frac=0.5):
     _,thresh = cv2.threshold(gray, 200, 255, cv2.THRESH_BINARY_INV) # threshold
     kernel = cv2.getStructuringElement(cv2.MORPH_CROSS,(3,3))
     dilated = cv2.dilate(thresh,kernel,iterations = param) # dilate
@@ -127,7 +130,7 @@ def find_tree_contour(gray, param):
     
     for i, contour in enumerate(contours):
         [x,y,w,h] = cv2.boundingRect(contour)
-        if h < gray.shape[0] * 0.5 or w < gray.shape[1] * 0.5: continue
+        if h < gray.shape[0] * min_frac or w < gray.shape[1] * min_frac: continue
         #cv2.rectangle(img, (x,y), (x+w,y+h), (255,0,255), 1)
         cv2.drawContours(out, contours, i, 0, -1)
 
