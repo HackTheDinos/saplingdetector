@@ -104,6 +104,7 @@ def find_root(nodes, node_neighbors):
 
 def depth_first_cycle_finder(img, nodes, node_neighbors, original_root, root=None, parent=None, sources = {}):
     if root is None:
+        sources = {}
         sources[original_root] = original_root
         root = original_root
     for neighbor in node_neighbors[root]:
@@ -111,18 +112,36 @@ def depth_first_cycle_finder(img, nodes, node_neighbors, original_root, root=Non
             continue
         if neighbor in sources:
             print("OOPS!", root, neighbor)
+            print(sources)
             # We found neighbor again
-            for i in sorted(sources):
-                if sources[i] == neighbor:
-                    break
+            #for i in sorted(sources):
+            #    cv2.line(img, nodes[i], nodes[sources[i]], (255,0,0), 2)
+            #cv2.imshow('test', img)
+            #cv2.waitKey(0)
+            path = []
+            i = root
+            while sources[i] != neighbor:
+                path.append(i)
+                i = sources[i]
+            path.append(neighbor)
+            print(path)
+            for j in range(len(path)):
+                d = np.sqrt(np.sum(np.power(np.array(nodes[path[j]]) - np.array(nodes[path[j-1]]), 2)))
+
+                print("Path: ", path[j], path[j-1], d)
+                
             d1 = np.sqrt(np.sum(np.power(np.array(nodes[i]) - np.array(nodes[neighbor]), 2)))
             d2 = np.sqrt(np.sum(np.power(np.array(nodes[root]) - np.array(nodes[neighbor]), 2)))
+            print('distance', i, neighbor, d1)
+            print('distance', root, neighbor, d2)
             if d1 > d2:
                 node_neighbors[neighbor] = [x for x in node_neighbors[neighbor] if x != i]
                 node_neighbors[i] = [x for x in node_neighbors[i] if x != neighbor]
+                print("removing", neighbor, i)
             else:
                 node_neighbors[neighbor] = [x for x in node_neighbors[neighbor] if x != root]
                 node_neighbors[root] = [x for x in node_neighbors[root] if x != neighbor]
+                print("removing", neighbor, root)
             return None
         sources[neighbor] = root
         #print(root, neighbor)
@@ -371,19 +390,18 @@ def main():
     print("Root:", root)
     
     #sources = breadth_first_disconnect(nodes, node_neighbors, root)
-    #sources = depth_first_cycle_finder(img, nodes, node_neighbors, root)
+    #sources = depth_first_cycle_finder(np.copy(img), nodes, node_neighbors, root)
     #while sources is None:
-    #    sources = depth_first_cycle_finder(img, nodes, node_neighbors, root)
+    #    print("TRYING AGAIN\n")
+    #    sources = depth_first_cycle_finder(np.copy(img), nodes, node_neighbors, root)
 
-    edges = edges_from_neighbors(node_neighbors)
-    distances = []
-        
-    print(edges)
-   
-    edges = remove_cycles(edges, nodes, root)
-    print(edges)
-    for src, dst in sorted(edges):
-        cv2.line(img, nodes[src], nodes[dst], (255,0,0), 2)
+    #edges = edges_from_neighbors(node_neighbors)
+    #distances = []
+    #print(edges)
+    #edges = remove_cycles(edges, nodes, root)
+    #print(edges)
+    #for src, dst in sorted(edges):
+    #    cv2.line(img, nodes[src], nodes[dst], (255,0,0), 2)
     
     # Delete nodes with only 2 neighbors as they are connections:
     for i in range(len(nodes)):
@@ -399,17 +417,14 @@ def main():
     
     # Print lines
     #for i in sorted(sources):
-    #    node_x, node_y = nodes[i]
-    #    src_x, src_y = nodes[i]
-    #    dst_x, dst_y = nodes[sources[i]]
-    #    cv2.line(img, node[i], nodes[sources[i]], (255,0,0), 2)
+    #    cv2.line(img, nodes[i], nodes[sources[i]], (255,0,0), 2)
 
     # Print lines
-    #for i in sorted(node_neighbors):
-    #    node_x, node_y = nodes[i]
-    #    for neighbor in node_neighbors[i]:
-    #        neighbor_x, neighbor_y = nodes[neighbor]
-    #        cv2.line(img, (node_x, node_y), (neighbor_x, neighbor_y), (0,255,0), 1)
+    for i in sorted(node_neighbors):
+        node_x, node_y = nodes[i]
+        for neighbor in node_neighbors[i]:
+            neighbor_x, neighbor_y = nodes[neighbor]
+            cv2.line(img, (node_x, node_y), (neighbor_x, neighbor_y), (0,255,0), 1)
 
     #print("SOURCES")
     #for i in sorted(sources):
