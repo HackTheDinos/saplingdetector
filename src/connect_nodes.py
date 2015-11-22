@@ -307,9 +307,10 @@ def nodes_from_corners(image, gray, points, max_dist=16, iterations=1):
 
 # Find the contour of the tree
 def find_tree_contour(gray, param, min_frac=0.5):
-    _,thresh = cv2.threshold(gray, 200, 255, cv2.THRESH_BINARY_INV) # threshold
+    # _,thresh = cv2.threshold(gray, 200, 255, cv2.THRESH_BINARY_INV) # threshold
+    thresh = cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY_INV, 15, 19)
     kernel = cv2.getStructuringElement(cv2.MORPH_CROSS,(3,3))
-    dilated = cv2.dilate(thresh,kernel,iterations = param) # dilate
+    dilated = cv2.dilate(thresh,kernel,iterations = 0) # dilate
     im2, contours, hierarchy = cv2.findContours(dilated, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE) 
 
     out = np.zeros(gray.shape, dtype=np.uint8) + 255
@@ -333,18 +334,19 @@ def find_tree_contour(gray, param, min_frac=0.5):
     return out2
 
 def find_tree_contours(gray, param):
-    _,thresh = cv2.threshold(gray, 200, 255, cv2.THRESH_BINARY_INV) # threshold
+    # _,thresh = cv2.threshold(gray, 200, 255, cv2.THRESH_BINARY_INV) # threshold
+    thresh = cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY_INV, 15, 19)
     kernel = cv2.getStructuringElement(cv2.MORPH_CROSS,(3,3))
     try:
-        dilated = cv2.dilate(thresh,kernel,iterations = param) # dilate
+        dilated = cv2.dilate(thresh,kernel,iterations = 0) # dilate
     except:
-        dilated = cv2.dilate(thresh,kernel,iterations=1) # dilate
-    im2, contours, hierarchy = cv2.findContours(dilated, cv2.RETR_LIST, cv2.CHAIN_APPROX_TC89_KCOS)
+        dilated = cv2.dilate(thresh,kernel,iterations=0) # dilate
+    im2, contours, hierarchy = cv2.findContours(dilated, cv2.RETR_LIST, cv2.CHAIN_APPROX_NONE)
     
     outs = []
     for i, contour in enumerate(contours):
         [x,y,w,h] = cv2.boundingRect(contour)
-        if h < gray.shape[0] * 0.5 or w < gray.shape[1] * 0.5: continue
+        if h < gray.shape[0] * 0.04 or w < gray.shape[1] * 0.04: continue
         #cv2.rectangle(img, (x,y), (x+w,y+h), (255,0,255), 1)
         out = np.zeros(gray.shape, dtype=np.uint8) + 255
         cv2.drawContours(out, contours, i, 0, -1)
@@ -364,16 +366,24 @@ def main():
 
     tree_contour = find_tree_contour(gray, param)
     cv2.imshow('dst2', tree_contour)
-        
-    dst = cv2.cornerHarris(tree_contour, 3, 3, 0.01)
-    dst = cv2.dilate(dst, None)
-    corners = dst > 0.05 * dst.max()
 
     points = []
-    for y in range(img.shape[0]):
-        for x in range(img.shape[1]):
-            if corners[y,x]:
-                points.append((x,y))
+
+    # dst = cv2.cornerHarris(tree_contour, 3, 3, 0.01)
+    # dst = cv2.dilate(dst, None)
+    # corners = dst > 0.05 * dst.max()
+
+    # for y in range(img.shape[0]):
+    #     for x in range(img.shape[1]):
+    #         if corners[y,x]:
+    #             points.append((x,y))
+
+    corners = cv2.goodFeaturesToTrack(tree_contour,400,0.25,8, useHarrisDetector=False)
+    corners = np.int0(corners)
+
+    for i in corners:
+        x,y = i.ravel()
+        points.append((x,y))
 
     nodes = nodes_from_corners(img, gray, points, max_dist=8, iterations=3)
     for i, node in enumerate(nodes):
