@@ -52,7 +52,7 @@ def find_connected_nodes(image, i, nodes):
                         break
 
             # Check if there's not something along the way
-            if i == 43 and j == 57:
+            if False: #i == 43 and j == 57:
                 print(i, j, other,
                       contour[y     - min_y + border,     x - min_x + border],
                       contour[dst_y - min_y + border, dst_x - min_x + border],
@@ -223,10 +223,35 @@ def main():
             if i not in node_neighbors[j]:
                 node_neighbors[j].append(i)
 
+    # Find Triangles
+    for i in range(len(nodes)):
+        for j in range(i + 1, len(nodes)):
+            for k in range(j + 1, len(nodes)):
+                if (i in node_neighbors[j] and i in node_neighbors[k] and
+                    j in node_neighbors[i] and j in node_neighbors[k] and
+                    k in node_neighbors[i] and k in node_neighbors[j]):
+                    d1 = np.sqrt(np.sum(np.power(np.array(nodes[i]) - np.array(nodes[j]), 2)))
+                    d2 = np.sqrt(np.sum(np.power(np.array(nodes[i]) - np.array(nodes[k]), 2)))
+                    d3 = np.sqrt(np.sum(np.power(np.array(nodes[j]) - np.array(nodes[k]), 2)))
+                    max_d = max(d1, d2, d3)
+                    if d1 == max_d:
+                        node_neighbors[i] = [x for x in node_neighbors[i] if x != j]
+                        node_neighbors[j] = [x for x in node_neighbors[j] if x != i]
+                    elif d2 == max_d:
+                        node_neighbors[i] = [x for x in node_neighbors[i] if x != k]
+                        node_neighbors[k] = [x for x in node_neighbors[k] if x != i]
+                    else:
+                        node_neighbors[j] = [x for x in node_neighbors[j] if x != k]
+                        node_neighbors[k] = [x for x in node_neighbors[k] if x != j]
+                        
+                    print('Triangle', i, j, k)
+                    
+                
     # Delete nodes with only 2 neighbors as they are connections:
     for i in range(len(nodes)):
         if len(node_neighbors[i]) == 2:
             n1, n2 = node_neighbors[i]
+            continue
             for j in node_neighbors:
                 print(node_neighbors[j], i, j)
                 node_neighbors[j] = [x for x in node_neighbors[j] if x != i]
