@@ -11,7 +11,7 @@ def get_rotated_pos(x, y, rot):
 def find_connected_nodes(image, i, nodes):
     out = []
     x, y = nodes[i]
-    for j in range(len(nodes)):
+    for j in range(i + 1, len(nodes)):
         if i == j: continue
         distance = np.sqrt(np.sum(np.power(np.array(nodes[i]) - np.array(nodes[j]), 2)))
         dst_x, dst_y = nodes[j]
@@ -31,7 +31,7 @@ def find_connected_nodes(image, i, nodes):
             start_y = image.shape[-2] // 3
             end_y = image.shape[-2]
         
-        contour = find_tree_contour(cutout, 1, 0.75)
+        contour = find_tree_contour(cutout, 1, 0.9)
         other = False
         for k in range(len(nodes)):
             if k == j or k == i: continue
@@ -42,11 +42,11 @@ def find_connected_nodes(image, i, nodes):
                 if contour[k_y, k_x] < 128:
                     other = True
                     break
-        #if i == 6 and j == 7:
-        #    print(i, j, other, contour[y - min_y + border, x - min_x + border], contour[dst_y - min_y + border, dst_x - min_x + border])
-        #    cv2.imshow('1', cutout)
-        #    cv2.imshow('2', contour)
-        #    cv2.waitKey(0)
+        if i == 10 and j == 14:
+            print(i, j, other, contour[y - min_y + border, x - min_x + border], contour[dst_y - min_y + border, dst_x - min_x + border])
+            cv2.imshow('1', cutout)
+            cv2.imshow('2', contour)
+            cv2.waitKey(0)
 
         if other == False and contour[y - min_y + border, x - min_x + border] < 128 and contour[dst_y - min_y + border, dst_x - min_x + border] < 128:
             out.append(j)
@@ -133,7 +133,15 @@ def find_tree_contour(gray, param, min_frac=0.5):
     
     for i, contour in enumerate(contours):
         [x,y,w,h] = cv2.boundingRect(contour)
-        if h < gray.shape[0] * min_frac or w < gray.shape[1] * min_frac: continue
+        if gray.shape[-1] > gray.shape[-2]:
+            if w < gray.shape[-1] * min_frac:
+                continue
+        elif gray.shape[-1] < gray.shape[-2]:
+            if h < gray.shape[-2] * min_frac:
+                continue
+        else:
+            if h < gray.shape[-2] * min_frac or w < gray.shape[-1] * min_frac:
+                continue
         #cv2.rectangle(img, (x,y), (x+w,y+h), (255,0,255), 1)
         cv2.drawContours(out, contours, i, 0, -1)
 
@@ -196,6 +204,7 @@ def main():
         for neighbor in node_neighbors[i]:
             neighbor_x, neighbor_y = nodes[neighbor]
             cv2.line(img, (node_x, node_y), (neighbor_x, neighbor_y), (255,0,0), 2)
+    for i, node in enumerate(nodes):
         cv2.putText(img, str(i), node, cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255))
             
     cv2.imshow('dst', img)
