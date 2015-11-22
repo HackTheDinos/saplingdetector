@@ -4,6 +4,85 @@ import numpy as np
 import sys
 from scipy.ndimage import rotate
 
+def unhook_triangles(nodes, node_neighbors):
+    for i in range(len(nodes)):
+        for j in range(i + 1, len(nodes)):
+            for k in range(j + 1, len(nodes)):
+                if (i in node_neighbors[j] and i in node_neighbors[k] and
+                    j in node_neighbors[i] and j in node_neighbors[k] and
+                    k in node_neighbors[i] and k in node_neighbors[j]):
+                    d1 = np.sqrt(np.sum(np.power(np.array(nodes[i]) - np.array(nodes[j]), 2)))
+                    d2 = np.sqrt(np.sum(np.power(np.array(nodes[i]) - np.array(nodes[k]), 2)))
+                    d3 = np.sqrt(np.sum(np.power(np.array(nodes[j]) - np.array(nodes[k]), 2)))
+                    max_d = max(d1, d2, d3)
+                    if d1 == max_d:
+                        node_neighbors[i] = [x for x in node_neighbors[i] if x != j]
+                        node_neighbors[j] = [x for x in node_neighbors[j] if x != i]
+                    elif d2 == max_d:
+                        node_neighbors[i] = [x for x in node_neighbors[i] if x != k]
+                        node_neighbors[k] = [x for x in node_neighbors[k] if x != i]
+                    else:
+                        node_neighbors[j] = [x for x in node_neighbors[j] if x != k]
+                        node_neighbors[k] = [x for x in node_neighbors[k] if x != j]
+                        
+                    print('Triangle', i, j, k)
+
+def find_root(nodes, node_neighbors):
+    leaves = []
+    for i in node_neighbors:
+        if len(node_neighbors[i]) == 1:
+            leaves.append(i)
+
+    max_D = 0
+    max_i = 0
+    for i in leaves:
+        min_d = 1000000
+        for j in leaves:
+            if i == j:
+                continue
+            d = np.sqrt(np.sum(np.power(np.array(nodes[i]) - np.array(nodes[j]), 2)))
+            if d < min_d:
+                min_d = d
+        if min_d > max_D:
+            max_i = i
+            max_D = min_d
+    return max_i
+
+def breadth_first_disconnect(nodes, node_neighbors, original_root):
+    sources = {}
+    return sources
+    levels = {}
+    roots = [original_root]
+    level = 0
+    while len(sources) < len(node_neighbors) and len(roots):
+        level += 1
+        new_roots = []
+        for root in roots:
+            neighbors_dist = []
+            for i in node_neighbors[root]:
+                node_neighbors[i] = [x for x in node_neighbors[i] if x != root]
+                distance = np.sqrt(np.sum(np.power(np.array(nodes[i]) - np.array(nodes[root]), 2)))
+                neighbors_dist.append(distance)
+            for i in reversed(range(len(node_neighbors[root]))):
+                if neighbors_dist[i]  > min(neighbors_dist) * 1.8:
+                    print("Removing %i from %i" % (node_neighbors[root][i], root))
+                    node_neighbors[root].pop(i)
+
+                
+            for i in node_neighbors[root]:
+                if i in sources:
+                    j = sources[i]
+                    node_neighbors[i] = [x for x in node_neighbors[i] if x != j]
+                    node_neighbors[j] = [x for x in node_neighbors[j] if x != i]
+                    print("GETTING RID OF ", i, j)
+                    return breadth_first_disconnect(nodes, node_neighbors, original_root)
+                sources[i] = root
+                levels[i] = level
+                new_roots.append(i)
+        roots = new_roots
+    for i in sorted(sources):
+        print('Source', i, sources[i])
+    return sources
 def get_rotated_pos(x, y, rot):
     return (int(x * np.cos(rot) - y * np.sin(rot) + 0.5),
             int(x * np.sin(rot) + y * np.cos(rot) + 0.5))
@@ -27,9 +106,11 @@ def find_connected_nodes(image, i, nodes):
         min_y = min(y, dst_y)
         max_x = max(x, dst_x)        
         max_y = max(y, dst_y)
-        border = 2
-        cutout = np.copy(image[min_y - border : max_y + border + 1, min_x - border : max_x + border + 1])
-
+        border = 12
+        A = image[min_y - border : max_y + border + 1, min_x - border : max_x + border + 1]
+        if np.min(A.shape) == 0:
+            continue
+        cutout = np.copy(A)
         
         if ((x - min_x) == 0 and (y - min_y) == 0) or ((dst_x - min_x) == 0 and (dst_y - min_y) == 0):
             cutout[top_right(cutout.shape[0], cutout.shape[1], min(cutout.shape) // 2 - cutout.shape[0])] = 255
@@ -52,11 +133,14 @@ def find_connected_nodes(image, i, nodes):
                         break
 
             # Check if there's not something along the way
-            if False: #i == 43 and j == 57:
+            if i == 207 and j == 216:
                 print(i, j, other,
                       contour[y     - min_y + border,     x - min_x + border],
                       contour[dst_y - min_y + border, dst_x - min_x + border],
                       nodes[i], nodes[j])
+                print(cutout[:5, :5])
+                print(image[dst_y - 2 : dst_y + 3, dst_x - 2 : dst_x + 3])
+                print(cutout[:5, :5])
                 print(image[dst_y - 2 : dst_y + 3, dst_x - 2 : dst_x + 3])
                 print(cutout[:5, :5])
                 print(contour[:5, :5])
@@ -67,39 +151,6 @@ def find_connected_nodes(image, i, nodes):
 
             if other == False and contour[y - min_y + border, x - min_x + border] < 200 and contour[dst_y - min_y + border, dst_x - min_x + border] < 200:
                 out.append(j)
-    return out
-
-def find_nearest_connected_nodes(image, i, nodes):
-    out = []
-    x, y = nodes[i]
-    min_j = i
-    min_dist = np.max(image.shape)
-    distances = []
-    good_js = []
-    for j in range(len(nodes)):
-        distance = np.sqrt(np.sum(np.power(np.array(nodes[i]) - np.array(nodes[j]), 2)))
-        distances.append(distance)
-        if i == j: continue
-        dst_x, dst_y = nodes[j]
-
-        angle = np.arctan2(dst_y - y, dst_x - x)
-        
-        min_x = min(x, dst_x)
-        min_y = min(y, dst_y)
-        max_x = max(x, dst_x)        
-        max_y = max(y, dst_y)
-        cutout = np.copy(image[min_y - 1  : max_y + 2, min_x - 1 : max_x + 2])
-
-        contours = find_tree_contours(cutout, 1)
-        for contour in contours:
-            if contour[y - min_y + 1, x - min_x + 1] < 128 and contour[dst_y - min_y + 1, dst_x - min_x + 1] < 128:
-                if distance < min_dist:
-                    min_j = j
-                    min_dist = distance
-                good_js.append(j)
-    for j in good_js:
-        if distances[j] < min_dist * 1.5:
-            out.append(nodes[j])
     return out
 
 # Nodes from corners
@@ -170,7 +221,10 @@ def find_tree_contour(gray, param, min_frac=0.5):
 def find_tree_contours(gray, param):
     _,thresh = cv2.threshold(gray, 200, 255, cv2.THRESH_BINARY_INV) # threshold
     kernel = cv2.getStructuringElement(cv2.MORPH_CROSS,(3,3))
-    dilated = cv2.dilate(thresh,kernel,iterations = param) # dilate
+    try:
+        dilated = cv2.dilate(thresh,kernel,iterations = param) # dilate
+    except:
+        dilated = cv2.dilate(thresh,kernel,iterations=1) # dilate
     im2, contours, hierarchy = cv2.findContours(dilated, cv2.RETR_LIST, cv2.CHAIN_APPROX_TC89_KCOS)
     
     outs = []
@@ -210,7 +264,6 @@ def main():
     nodes = nodes_from_corners(img, gray, points, max_dist=8, iterations=3)
     for i, node in enumerate(nodes):
         x, y = node
-        print(i, gray[y, x])
 
     # Figure out node neighbors
     node_neighbors = {}
@@ -224,29 +277,14 @@ def main():
                 node_neighbors[j].append(i)
 
     # Find Triangles
-    for i in range(len(nodes)):
-        for j in range(i + 1, len(nodes)):
-            for k in range(j + 1, len(nodes)):
-                if (i in node_neighbors[j] and i in node_neighbors[k] and
-                    j in node_neighbors[i] and j in node_neighbors[k] and
-                    k in node_neighbors[i] and k in node_neighbors[j]):
-                    d1 = np.sqrt(np.sum(np.power(np.array(nodes[i]) - np.array(nodes[j]), 2)))
-                    d2 = np.sqrt(np.sum(np.power(np.array(nodes[i]) - np.array(nodes[k]), 2)))
-                    d3 = np.sqrt(np.sum(np.power(np.array(nodes[j]) - np.array(nodes[k]), 2)))
-                    max_d = max(d1, d2, d3)
-                    if d1 == max_d:
-                        node_neighbors[i] = [x for x in node_neighbors[i] if x != j]
-                        node_neighbors[j] = [x for x in node_neighbors[j] if x != i]
-                    elif d2 == max_d:
-                        node_neighbors[i] = [x for x in node_neighbors[i] if x != k]
-                        node_neighbors[k] = [x for x in node_neighbors[k] if x != i]
-                    else:
-                        node_neighbors[j] = [x for x in node_neighbors[j] if x != k]
-                        node_neighbors[k] = [x for x in node_neighbors[k] if x != j]
-                        
-                    print('Triangle', i, j, k)
-                    
-                
+    unhook_triangles(nodes, node_neighbors)
+
+    # Find Root
+    root = find_root(nodes, node_neighbors)
+    print("Root:", root)
+    
+    sources = breadth_first_disconnect(nodes, node_neighbors, root)
+    
     # Delete nodes with only 2 neighbors as they are connections:
     for i in range(len(nodes)):
         if len(node_neighbors[i]) == 2:
@@ -258,21 +296,29 @@ def main():
             node_neighbors[n1].append(n2)
             node_neighbors[n2].append(n1)
             del node_neighbors[i]
-                
+    
+    # Print lines
+    #for i in sorted(sources):
+    #    node_x, node_y = nodes[i]
+    #    src_x, src_y = nodes[i]
+    #    dst_x, dst_y = nodes[sources[i]]
+    #    cv2.line(img, node[i], nodes[sources[i]], (255,0,0), 2)
+
     # Print lines
     for i in sorted(node_neighbors):
         node_x, node_y = nodes[i]
         for neighbor in node_neighbors[i]:
             neighbor_x, neighbor_y = nodes[neighbor]
             cv2.line(img, (node_x, node_y), (neighbor_x, neighbor_y), (255,0,0), 2)
+                                                                                
                 
     for i in sorted(node_neighbors):
         print(i, node_neighbors[i])
             
     for i in sorted(node_neighbors):
         cv2.putText(img, str(i), nodes[i], cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255))
-
     
+        
         
     cv2.imshow('dst', img)
     if cv2.waitKey(0) & 0xff == 27:
