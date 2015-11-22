@@ -319,7 +319,7 @@ def main():
         cv2.putText(img, str(i), nodes[i], cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255))
     
     tree = {}
-    
+
         
     cv2.imshow('dst', img)
     if cv2.waitKey(0) & 0xff == 27:
