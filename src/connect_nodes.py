@@ -4,6 +4,61 @@ import numpy as np
 import sys
 from scipy.ndimage import rotate
 import operator
+from collections import Counter
+from pprint import pprint
+
+class Nodetree(object):
+
+    def node_count(self):
+        nodes=[]
+        for i in self.nodelist:
+            nodes=nodes+i['connections']
+        nc=Counter(nodes)
+        out = {}
+        for k, v in nc.iteritems():
+         out[v] = out.get(v, [])
+         out[v].append(k)
+        return out
+
+
+    def find_parent(self,coord):
+        potentials=[]
+        for i in self.nodelist:
+            if coord in i['connections'] and i['coordinates'] != coord:
+                potentials.append(i['coordinates'])
+        if len(potentials)==1:
+            return potentials[0]
+        else:
+            return potentials
+
+    def __init__(self,nodelist):
+        self.nodelist=nodelist
+        self.nodecount=self.node_count()
+        self.allnodes=[]
+        self.nodedict={}
+        for i in nodelist:
+            self.allnodes=self.allnodes+i['connections']
+        self.allnodes=list(set(self.allnodes))
+        for i in self.allnodes:
+            self.nodedict[i]={'coordinates':i,'connections':[],'parent':self.find_parent(i),'children':[]}
+            for j in self.nodelist:
+                if i in j['connections']:
+                    self.nodedict[i]['connections'].append(j['coordinates'])
+            self.nodedict[i]['children']=[j for j in self.nodedict[i]['connections'] if j != self.nodedict[i]['parent']]
+        for i in self.nodedict:
+            for j in self.nodedict[i]['children']:
+                #print i,j,self[j]['parent']
+                if len(self[j]['parent']) > 1 and self[i]['parent']==j:
+                    self.nodedict[i]['parent']=j
+
+        for i in self.nodedict:
+            if isinstance(self[i]['parent'],list):
+                self[i]['parent']=None
+        self.tree=self.nodedict
+
+    def __getitem__(self,k):
+        return self.nodedict[k]
+
 
 def edges_from_neighbors(neighbors):
     edges = []
@@ -283,7 +338,9 @@ def find_tree_contour(gray, param, min_frac=0.5):
     _,thresh = cv2.threshold(gray, 200, 255, cv2.THRESH_BINARY_INV) # threshold
     kernel = cv2.getStructuringElement(cv2.MORPH_CROSS,(3,3))
     dilated = cv2.dilate(thresh,kernel,iterations = param) # dilate
-    im2, contours, hierarchy = cv2.findContours(dilated, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE) 
+    #im2, contours, hierarchy = cv2.findContours(dilated, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE) #opencv compat issue
+    contours, hierarchy = cv2.findContours(dilated, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE) #opencv compat issue
+
 
     out = np.zeros(gray.shape, dtype=np.uint8) + 255
     
@@ -312,7 +369,9 @@ def find_tree_contours(gray, param):
         dilated = cv2.dilate(thresh,kernel,iterations = param) # dilate
     except:
         dilated = cv2.dilate(thresh,kernel,iterations=1) # dilate
-    im2, contours, hierarchy = cv2.findContours(dilated, cv2.RETR_LIST, cv2.CHAIN_APPROX_TC89_KCOS)
+    #im2, contours, hierarchy = cv2.findContours(dilated, cv2.RETR_LIST, cv2.CHAIN_APPROX_TC89_KCOS) #opencv compat issue
+    contours, hierarchy = cv2.findContours(dilated, cv2.RETR_LIST, cv2.CHAIN_APPROX_TC89_KCOS) #opencv compat issue
+
     
     outs = []
     for i, contour in enumerate(contours):
@@ -353,8 +412,10 @@ def main():
         x, y = node
 
     # Figure out node neighbors
+    node_positions = {}
     node_neighbors = {}
     for i, node in enumerate(nodes):
+        node_positions[i]=node
         node_neighbors[i] = find_connected_nodes(gray, i, nodes)
 
     # Do reciprocal adding of nodes
@@ -414,7 +475,19 @@ def main():
     #print("SOURCES")
     #for i in sorted(sources):
     #    print(i, sources[i])
-                                                                                
+      
+    nodes_for_tree=[]                
+    for i in sorted(node_neighbors):
+        out=[]
+        for j in node_neighbors[i]:
+            out.append(node_positions[j])
+        nodes_for_tree.append({'coordinates':node_positions[i], 'connections':out})
+
+    tree = Nodetree(nodes_for_tree)
+    
+    pprint(tree.tree)
+
+
     print("NODE NEIGHBORS")
     for i in sorted(node_neighbors):
         print(i, node_neighbors[i])
