@@ -22,7 +22,8 @@ def find_connected_nodes(image, i, nodes):
         min_y = min(y, dst_y)
         max_x = max(x, dst_x)        
         max_y = max(y, dst_y)
-        cutout = np.copy(image[min_y - 1  : max_y + 2, min_x - 1 : max_x + 2])
+        border = 4
+        cutout = np.copy(image[min_y - border : max_y + border + 1, min_x - border : max_x + border + 1])
 
         if ((x - min_x) == 0 and (y - min_y) == 0) or ((dst_x - min_x) == 0 and (dst_y - min_y) == 0):
             start_x = image.shape[-1] // 3
@@ -35,18 +36,20 @@ def find_connected_nodes(image, i, nodes):
         for k in range(len(nodes)):
             if k == j or k == i: continue
             k_x, k_y = nodes[k]
-            k_x = k_x - min_x + 1
-            k_y = k_y - min_y + 1
-            if k_x >= 0 and k_x < cutout.shape[-1] and k_y >= 0 and k_y < cutout.shape[-2]:
+            k_x = k_x - min_x + border
+            k_y = k_y - min_y + border
+            if k_x >= border and k_x < cutout.shape[-1] - border and k_y >= border and k_y < cutout.shape[-2] - border:
                 if contour[k_y, k_x] < 128:
                     other = True
                     break
-        
-        if other == False and contour[y - min_y + 1, x - min_x + 1] < 128 and contour[dst_y - min_y + 1, dst_x - min_x + 1] < 128:
-            #cv2.imshow('1', cutout)
-            #cv2.imshow('2', contour)
-            #cv2.waitKey(0)
-            out.append(nodes[j])                
+        #if i == 6 and j == 7:
+        #    print(i, j, other, contour[y - min_y + border, x - min_x + border], contour[dst_y - min_y + border, dst_x - min_x + border])
+        #    cv2.imshow('1', cutout)
+        #    cv2.imshow('2', contour)
+        #    cv2.waitKey(0)
+
+        if other == False and contour[y - min_y + border, x - min_x + border] < 128 and contour[dst_y - min_y + border, dst_x - min_x + border] < 128:
+            out.append(j)
     return out
 
 def find_nearest_connected_nodes(image, i, nodes):
@@ -188,11 +191,12 @@ def main():
     node_neighbors = {}
     for i, node in enumerate(nodes):
         node_neighbors[i] = find_connected_nodes(gray, i, nodes)
-        #node_neighbors[i] = find_nearest_connected_nodes(gray, i, nodes)
+        print(i, node_neighbors[i])
         node_x, node_y = node
         for neighbor in node_neighbors[i]:
-            neighbor_x, neighbor_y = neighbor
+            neighbor_x, neighbor_y = nodes[neighbor]
             cv2.line(img, (node_x, node_y), (neighbor_x, neighbor_y), (255,0,0), 2)
+        cv2.putText(img, str(i), node, cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255))
             
     cv2.imshow('dst', img)
     if cv2.waitKey(0) & 0xff == 27:
