@@ -20,7 +20,7 @@ def get_text(img,x,y,w,h):
     text = pytesseract.image_to_string(Image.open('~/Downloads/temp.png'),lang='lat')
     return text
 
-def get_text_positions(contours, grays):
+def get_text_positions(image, contours, grays):
     storage = {}
     for index, contour in enumerate(contours):
         [x,y,w,h] = cv2.boundingRect(contour)
@@ -76,10 +76,18 @@ def assign_text_to_leaves(opencv_img, node_neighbors, node_positions):
     im2, contours, hierarchy = cv2.findContours(dilated,cv2.RETR_EXTERNAL,cv2.CHAIN_APPROX_NONE) # get contours
 
     ends = grab_endpoints(node_neighbors, node_positions)
-    text_name_pos = get_text_positions(contours, grays)
+    # dict with text position : words
+    text_name_pos = get_text_positions(opencv_img, contours, grays)
+    # dict with {text position : end position}
     text_match = find_nearest(text_name_pos, ends)
     # dict with end_node position: [word positions]
     ends_to_words = combine_separate_words(text_name_pos, text_match)
+    readable = {}
+    for k in ends_to_words.keys():
+        for key in node_positions.keys():
+            if node_positions[key] == ends_to_words[k]:
+                readable[key] = text_name_pos[k]
+    print readable
 
     # to check matches
     # for key, value in text_match.iteritems():
