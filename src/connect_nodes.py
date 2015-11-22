@@ -8,6 +8,11 @@ def get_rotated_pos(x, y, rot):
     return (int(x * np.cos(rot) - y * np.sin(rot) + 0.5),
             int(x * np.sin(rot) + y * np.cos(rot) + 0.5))
 
+bottom_right = lambda N, M, k: np.fliplr(np.tri(N, M, k=k)) == 1
+top_left = lambda N, M, k: np.flipud(np.tri(N, M, k=k)) == 1
+bottom_left = lambda N, M, k: np.tri(N, M, k=k) == 1
+top_right = lambda N, M, k: np.flipud(np.fliplr(np.tri(N, M, k=k))) == 1
+
 def find_connected_nodes(image, i, nodes):
     out = []
     x, y = nodes[i]
@@ -22,34 +27,46 @@ def find_connected_nodes(image, i, nodes):
         min_y = min(y, dst_y)
         max_x = max(x, dst_x)        
         max_y = max(y, dst_y)
-        border = 4
+        border = 2
         cutout = np.copy(image[min_y - border : max_y + border + 1, min_x - border : max_x + border + 1])
 
-        if ((x - min_x) == 0 and (y - min_y) == 0) or ((dst_x - min_x) == 0 and (dst_y - min_y) == 0):
-            start_x = image.shape[-1] // 3
-            end_x = image.shape[-1]
-            start_y = image.shape[-2] // 3
-            end_y = image.shape[-2]
         
-        contour = find_tree_contour(cutout, 1, 0.9)
-        other = False
-        for k in range(len(nodes)):
-            if k == j or k == i: continue
-            k_x, k_y = nodes[k]
-            k_x = k_x - min_x + border
-            k_y = k_y - min_y + border
-            if k_x >= border and k_x < cutout.shape[-1] - border and k_y >= border and k_y < cutout.shape[-2] - border:
-                if contour[k_y, k_x] < 128:
-                    other = True
-                    break
-        if i == 10 and j == 14:
-            print(i, j, other, contour[y - min_y + border, x - min_x + border], contour[dst_y - min_y + border, dst_x - min_x + border])
-            cv2.imshow('1', cutout)
-            cv2.imshow('2', contour)
-            cv2.waitKey(0)
+        if ((x - min_x) == 0 and (y - min_y) == 0) or ((dst_x - min_x) == 0 and (dst_y - min_y) == 0):
+            cutout[top_right(cutout.shape[0], cutout.shape[1], min(cutout.shape) // 2 - cutout.shape[0])] = 255
+            cutout[bottom_left(cutout.shape[0], cutout.shape[1], min(cutout.shape) // 2 - cutout.shape[0])] = 255
+        else:
+            cutout[top_left(cutout.shape[0], cutout.shape[1], min(cutout.shape) // 2 - cutout.shape[0])] = 255
+            cutout[bottom_right(cutout.shape[0], cutout.shape[1], min(cutout.shape) // 2 - cutout.shape[0])] = 255
+            
+        contours = find_tree_contours(cutout, 2)
+        for contour in contours:
+            other = False
+            for k in range(len(nodes)):
+                if k == j or k == i: continue
+                k_x, k_y = nodes[k]
+                k_x = k_x - min_x + border
+                k_y = k_y - min_y + border
+                if k_x >= border and k_x < cutout.shape[-1] - border and k_y >= border and k_y < cutout.shape[-2] - border:
+                    if contour[k_y, k_x] < 200:
+                        other = True
+                        break
 
-        if other == False and contour[y - min_y + border, x - min_x + border] < 128 and contour[dst_y - min_y + border, dst_x - min_x + border] < 128:
-            out.append(j)
+            # Check if there's not something along the way
+            if i == 43 and j == 57:
+                print(i, j, other,
+                      contour[y     - min_y + border,     x - min_x + border],
+                      contour[dst_y - min_y + border, dst_x - min_x + border],
+                      nodes[i], nodes[j])
+                print(image[dst_y - 2 : dst_y + 3, dst_x - 2 : dst_x + 3])
+                print(cutout[:5, :5])
+                print(contour[:5, :5])
+
+                cv2.imshow('1', cutout)
+                cv2.imshow('2', contour)
+                cv2.waitKey(0)
+
+            if other == False and contour[y - min_y + border, x - min_x + border] < 200 and contour[dst_y - min_y + border, dst_x - min_x + border] < 200:
+                out.append(j)
     return out
 
 def find_nearest_connected_nodes(image, i, nodes):
@@ -89,16 +106,17 @@ def find_nearest_connected_nodes(image, i, nodes):
 def nodes_from_corners(image, gray, points, max_dist=16, iterations=1):
     if iterations == 0:
         out = []
-        for point in points:
+
+        for j, point in enumerate(points):
             x, y = map(int, point)
-            A = gray[y - 2 : y + 3, x - 2 : x + 3]
-            off_x, off_y = np.array(np.unravel_index(A.argmin(), A.shape)) - 2
+            A = gray[y - 1 : y + 2, x - 1 : x + 2]
+            off_y, off_x = np.array(np.unravel_index(A.argmin(), A.shape)) - 1
             new_x, new_y = x + off_x, y + off_y
             if gray[new_y, new_x] < gray[y, x]:
                 out.append((new_x,new_y))
             else:
                 out.append((x,y))
-                
+
         return out
     print('iternations:', iterations)
     nodes = []
@@ -147,15 +165,14 @@ def find_tree_contour(gray, param, min_frac=0.5):
 
     out2 = np.zeros(gray.shape, dtype=np.uint8) + 255
     out2[out == 0] = gray[out == 0]
-    #out2[out < 2010] = 0
     return out2
 
 def find_tree_contours(gray, param):
     _,thresh = cv2.threshold(gray, 200, 255, cv2.THRESH_BINARY_INV) # threshold
     kernel = cv2.getStructuringElement(cv2.MORPH_CROSS,(3,3))
     dilated = cv2.dilate(thresh,kernel,iterations = param) # dilate
-    im2, contours, hierarchy = cv2.findContours(dilated, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE) 
-
+    im2, contours, hierarchy = cv2.findContours(dilated, cv2.RETR_LIST, cv2.CHAIN_APPROX_TC89_KCOS)
+    
     outs = []
     for i, contour in enumerate(contours):
         [x,y,w,h] = cv2.boundingRect(contour)
@@ -181,13 +198,8 @@ def main():
     cv2.imshow('dst2', tree_contour)
         
     dst = cv2.cornerHarris(tree_contour, 3, 3, 0.01)
-
-    #result is dilated for marking the corners, not important
     dst = cv2.dilate(dst, None)
-
-    # Threshold for an optimal value, it may vary depending on the image.
     corners = dst > 0.05 * dst.max()
-    #img[corners] = [0, 0, 255]
 
     points = []
     for y in range(img.shape[0]):
@@ -195,18 +207,48 @@ def main():
             if corners[y,x]:
                 points.append((x,y))
 
-    nodes = nodes_from_corners(img, gray, points, max_dist=6, iterations=3)
+    nodes = nodes_from_corners(img, gray, points, max_dist=8, iterations=3)
+    for i, node in enumerate(nodes):
+        x, y = node
+        print(i, gray[y, x])
+
+    # Figure out node neighbors
     node_neighbors = {}
     for i, node in enumerate(nodes):
         node_neighbors[i] = find_connected_nodes(gray, i, nodes)
-        print(i, node_neighbors[i])
-        node_x, node_y = node
+
+    # Do reciprocal adding of nodes
+    for i in range(len(nodes)):
+        for j in node_neighbors[i]:
+            if i not in node_neighbors[j]:
+                node_neighbors[j].append(i)
+
+    # Delete nodes with only 2 neighbors as they are connections:
+    for i in range(len(nodes)):
+        if len(node_neighbors[i]) == 2:
+            n1, n2 = node_neighbors[i]
+            for j in node_neighbors:
+                print(node_neighbors[j], i, j)
+                node_neighbors[j] = [x for x in node_neighbors[j] if x != i]
+            node_neighbors[n1].append(n2)
+            node_neighbors[n2].append(n1)
+            del node_neighbors[i]
+                
+    # Print lines
+    for i in sorted(node_neighbors):
+        node_x, node_y = nodes[i]
         for neighbor in node_neighbors[i]:
             neighbor_x, neighbor_y = nodes[neighbor]
             cv2.line(img, (node_x, node_y), (neighbor_x, neighbor_y), (255,0,0), 2)
-    for i, node in enumerate(nodes):
-        cv2.putText(img, str(i), node, cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255))
+                
+    for i in sorted(node_neighbors):
+        print(i, node_neighbors[i])
             
+    for i in sorted(node_neighbors):
+        cv2.putText(img, str(i), nodes[i], cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255))
+
+    
+        
     cv2.imshow('dst', img)
     if cv2.waitKey(0) & 0xff == 27:
         cv2.destroyAllWindows()
