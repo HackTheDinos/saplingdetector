@@ -4,6 +4,7 @@ import numpy as np
 import sys
 import pdb
 import math
+import pytesseract
 from PIL import Image
 
 def grab_endpoints(node_neighbors, node_positions):
@@ -77,15 +78,18 @@ def assign_text_to_leaves(opencv_img, node_neighbors, node_positions):
     ends = grab_endpoints(node_neighbors, node_positions)
     text_name_pos = get_text_positions(contours, grays)
     text_match = find_nearest(text_name_pos, ends)
+    # dict with end_node position: [word positions]
+    ends_to_words = combine_separate_words(text_name_pos, text_match)
 
-    for key, value in text_match.iteritems():
-        color = (np.random.randint(0,255), np.random.randint(0,255), np.random.randint(0,255))
-        cv2.rectangle(img, key, (key[0]+50,key[1]+50), color, 2)
-        cv2.rectangle(img, value, (value[0]+50,value[1]+50), color, 2)
+    # to check matches
+    # for key, value in text_match.iteritems():
+    #     color = (np.random.randint(0,255), np.random.randint(0,255), np.random.randint(0,255))
+    #     cv2.rectangle(img, key, (key[0]+50,key[1]+50), color, 2)
+    #     cv2.rectangle(img, value, (value[0]+50,value[1]+50), color, 2)
 
-    cv2.imshow('%i' % param,img)
-    if cv2.waitKey(0) & 0xff == 27:
-        cv2.destroyAllWindows()
+    # cv2.imshow('%i' % param,img)
+    # if cv2.waitKey(0) & 0xff == 27:
+    #     cv2.destroyAllWindows()
 
 
 
